@@ -122,6 +122,68 @@ async def second_state_recieve_year(message) :
             cursor.execute(f"UPDATE events_buffer SET month_id = '{message_id}' WHERE user_id = {user_id};")
 
 
+async def third_state_recieve_month(client, callback_query):
+    'Recieving month of birth'
+    
+    user_id = callback_query.from_user.id
+    month = callback_query.data 
+    
+    message_id = callback_query.message.message_id
+    await app.delete_messages(user_id ,message_id)
+    
+    with connection:
+        with connection.cursor() as cursor:
+            cursor.execute(f"SELECT state FROM users WHERE user_id = {user_id};")
+            user_state = cursor.fetchall()
+            if user_state[0][0] != 3:
+                await app.send_message(user_id ,f"در زمان اشتباهی از کلید های شیشه ای استفاده کردید، دوباره از ابتدا مراحل را آغاز کنید", reply_markup=key.mark)
+                empty_buffer(user_id, cursor)
+                return
+            cursor.execute(f"SELECT month_id FROM events_buffer WHERE user_id = {user_id};")
+            month_message_id = cursor.fetchall() 
+            if message_id != month_message_id[0][0]:
+                await app.send_message(user_id ,f"برای انتخاب کردن ماه تولد لطفا از آخرین کلید شیشه ای تولید شده استفاده کنید.", reply_markup=key.mark)
+                return
+            cursor.execute(f"UPDATE users SET state = 4 WHERE user_id = {user_id};")  
+            cursor.execute(f"UPDATE events_buffer SET month = '{month}' WHERE user_id = {user_id};")  
+
+    
+    await app.send_message(user_id ,f"ماه {key.month_dic_key_value[month]} انتخاب شد.")
+    days_list = np.array([])
+    for i in range(1,31):
+        days_list = np.append(days_list,[InlineKeyboardButton(text = f"{i}",callback_data = f"{i}")])
+    days_list = days_list.reshape(5,6)
+
+    if(int(month) <= 6):
+        
+        days_mark = InlineKeyboardMarkup([
+            days_list[0],
+            days_list[1],
+            days_list[2],
+            days_list[3],
+            days_list[4],
+            [InlineKeyboardButton(text = "31",callback_data="31")] 
+        ])
+    else:
+        days_mark= InlineKeyboardMarkup(days_list)
+    message = await app.send_message(user_id ,f"روز تولد ایشان را انتخاب کنید.", reply_markup=days_mark)
+    message_id = message.message_id
+    
+    with connection:
+        with connection.cursor() as cursor:  
+            cursor.execute(f"UPDATE events_buffer SET day_id = '{message_id}' WHERE user_id = {user_id};")  
+            
+
+@app.on_callback_query()
+async def callback_query_handler(client, callback_query):
+    
+    text = callback_query.message.text
+    
+    if text == "ماه تولد ایشان را انتخاب کنید.":
+        await third_state_recieve_month(client, callback_query)
+        return
+
+
 @app.on_message()
 async def data_gathering(client, message):
 
@@ -146,6 +208,10 @@ async def data_gathering(client, message):
     
     if user_state[0][0] == 2:
         await second_state_recieve_year(message)  
+        return
+    
+    if user_state[0][0] == 3:
+        await app.send_message(user_id ,".برای وارد کردن ماه تولد از دکمه های شیشه ای استفاده کنید",reply_markup=mark)
         return
 
 app.run()
