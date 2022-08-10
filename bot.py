@@ -209,7 +209,29 @@ async def fourth_state_recieve_day(client, callback_query):
             cursor.execute(f"INSERT INTO events (user_id, birthday_person_name, date_of_birth) VALUES ({user_id},'{birthday_person_name}','{date}');")
             empty_buffer(user_id, cursor)
             await app.send_message(user_id ,f"تولد {birthday_person_name} در تاریخ {int(day)}ام ماه {key.month_dic_key_value[str(month)]} سال {year} با موفقیت ذخیره شد.", reply_markup=key.mark)
+            
 
+async def old_event(message):
+    'Showing old events inlineKeyboardButton if available'
+    user_id = message.from_user.id
+    
+    with connection:
+        with connection.cursor() as cursor:
+            empty_buffer(user_id, cursor)
+            cursor.execute(f"SELECT birthday_person_name FROM events WHERE user_id = {user_id};")
+            birthday_person_names = cursor.fetchall()
+    
+    if len(birthday_person_names) == 0:
+        await app.send_message(user_id , f"هیچ تاریخ تولدی در اکانت شما ثبت نشده است.")
+        return
+           
+    birthday_person_names_list = []
+    for item in birthday_person_names:
+        birthday_person_names_list.append([InlineKeyboardButton(text = f"{item[0]}",callback_data = f"{item[0]}")])
+    
+    mark = InlineKeyboardMarkup(inline_keyboard=birthday_person_names_list)
+    
+    await app.send_message(user_id , f"تولد چه کسی را میخواهید مشاهده کنید؟", reply_markup=mark)
 
 
 @app.on_callback_query()
@@ -232,6 +254,10 @@ async def data_gathering(client, message):
     
     if message.text == "ثبت تاریخ تولد جدید":
         await new_event(message)
+        return 
+    
+    if message.text == "مشاهده تاریخ تولد های ثبت شده":
+        await old_event(message)
         return 
     
     with connection:
