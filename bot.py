@@ -70,5 +70,14 @@ async def data_gathering(client, message):
         await new_event(message)
         return 
     
+    with connection:
+        with connection.cursor() as cursor:
+            cursor.execute(f"SELECT state FROM users WHERE user_id = {user_id};")
+            user_state = cursor.fetchall()
+    
+    if user_state[0][0] == 0:
+        await app.send_message(user_id ,"نمیفهمم چی میگید از دکمه های شیشه ای استفاده کنید. ",reply_markup=key.mark)
+        return
+    
 
 app.run()
