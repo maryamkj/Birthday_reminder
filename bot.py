@@ -61,6 +61,36 @@ async def new_event(message):
             cursor.execute(f"UPDATE users SET state = 1 WHERE user_id = {user_id};")
 
 
+async def first_state_recieve_name(message):
+    'Recieving birthday person name'
+    user_id = message.from_user.id
+    birthday_person_name = message.text
+    if len(birthday_person_name) > 30 :
+        await app.send_message(user_id ,"نام شخص نهایتا میتواند ۳۰ کاراکتر باشد، یک بار دیگر نام ایشان را خلاصه تر وارد کنید.")
+        return
+    
+    with connection:
+        with connection.cursor() as cursor:
+            cursor.execute(f"SELECT TRUE FROM events WHERE birthday_person_name = '{birthday_person_name}' and user_id = '{user_id}';")
+            is_repeated = cursor.fetchall()
+            try:
+                if is_repeated[0][0] == True:
+                    await app.send_message(user_id ,"قبلا برای این اسم یک تاریخ تولد ثبت کردید. اسم ایشان را خلاصه تر یا به همراه یک ایموجی وارد کنید.")
+                    return
+            except:
+                pass
+            cursor.execute(f"SELECT COUNT(user_id) FROM events_buffer WHERE user_id = {user_id};")
+            has_unfinished = cursor.fetchall()
+            if has_unfinished[0][0] == 0:
+                cursor.execute(f"INSERT INTO events_buffer (user_id,birthday_person_name) VALUES ({user_id},'{birthday_person_name}');")
+            else:
+                cursor.execute(f"UPDATE events_buffer SET birthday_person_name = '{birthday_person_name}' WHERE user_id = {user_id};")
+            cursor.execute(f"UPDATE users SET state = 2 WHERE user_id = {user_id};")
+            
+    await app.send_message(user_id ,"سال تولد ایشان را ۴ رقمی وارد کنید. برای مثال ۱۳۷۳")
+            
+
+
 @app.on_message()
 async def data_gathering(client, message):
 
@@ -79,5 +109,8 @@ async def data_gathering(client, message):
         await app.send_message(user_id ,"نمیفهمم چی میگید از دکمه های شیشه ای استفاده کنید. ",reply_markup=key.mark)
         return
     
+    if user_state[0][0] == 1:
+        await first_state_recieve_name(message)
+        return
 
 app.run()
