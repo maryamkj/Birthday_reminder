@@ -174,6 +174,44 @@ async def third_state_recieve_month(client, callback_query):
             cursor.execute(f"UPDATE events_buffer SET day_id = '{message_id}' WHERE user_id = {user_id};")  
             
 
+async def fourth_state_recieve_day(client, callback_query):
+    'Recieving day of birth'
+    
+    day = callback_query.data.zfill(2)
+    user_id = callback_query.from_user.id
+    
+    message_id = callback_query.message.message_id
+    await app.delete_messages(user_id ,message_id)
+    
+    with connection:
+        with connection.cursor() as cursor:    
+            cursor.execute(f"SELECT state FROM users WHERE user_id = {user_id};")
+            user_state = cursor.fetchall()
+            if user_state[0][0] != 4:
+                await app.send_message(user_id ,f"در زمان اشتباهی از کلید های شیشه ای استفاده کردید، دوباره از ابتدا مراحل را آغاز کنید", reply_markup=key.mark)
+                empty_buffer(user_id, cursor)
+                return 
+            cursor.execute(f"SELECT day_id FROM events_buffer WHERE user_id = {user_id};")
+            month_message_id = cursor.fetchall() 
+            if message_id != month_message_id[0][0]:
+                await app.send_message(user_id ,f"برای انتخاب کردن روز تولد لطفا از آخرین کلید شیشه ای تولید شده استفاده کنید.", reply_markup=key.mark)
+                return
+            cursor.execute(f"SELECT * FROM events_buffer WHERE user_id = {user_id};")
+            buffer = cursor.fetchall()
+            birthday_person_name = buffer[0][1]
+            year = buffer[0][2]
+            month = str(buffer[0][3]).zfill(2)
+            date = f"{year}/{month}/{day}"
+            if date > str(JalaliDate.today()):
+                await app.send_message(user_id ,f"تاریخ تولد وارد شده معتبر نیست، دوباره از ابتدا مراحل را آغاز کنید.", reply_markup=key.mark)
+                empty_buffer(user_id, cursor)
+                return
+            cursor.execute(f"INSERT INTO events (user_id, birthday_person_name, date_of_birth) VALUES ({user_id},'{birthday_person_name}','{date}');")
+            empty_buffer(user_id, cursor)
+            await app.send_message(user_id ,f"تولد {birthday_person_name} در تاریخ {int(day)}ام ماه {key.month_dic_key_value[str(month)]} سال {year} با موفقیت ذخیره شد.", reply_markup=key.mark)
+
+
+
 @app.on_callback_query()
 async def callback_query_handler(client, callback_query):
     
@@ -183,6 +221,9 @@ async def callback_query_handler(client, callback_query):
         await third_state_recieve_month(client, callback_query)
         return
 
+    if text == "روز تولد ایشان را انتخاب کنید.":
+        await fourth_state_recieve_day(client, callback_query)
+        return
 
 @app.on_message()
 async def data_gathering(client, message):
@@ -211,7 +252,11 @@ async def data_gathering(client, message):
         return
     
     if user_state[0][0] == 3:
-        await app.send_message(user_id ,".برای وارد کردن ماه تولد از دکمه های شیشه ای استفاده کنید",reply_markup=mark)
+        await app.send_message(user_id ,".برای وارد کردن ماه تولد از دکمه های شیشه ای استفاده کنید",reply_markup=key.mark)
+        return
+    
+    if user_state[0][0] == 4:
+        await app.send_message(user_id ,".برای وارد کردن روز تولد از دکمه های شیشه ای استفاده کنید",reply_markup=key.mark)
         return
 
 app.run()
