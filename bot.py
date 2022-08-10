@@ -4,6 +4,8 @@ import constants as keys
 import const as key
 import psycopg2
 from persiantools.jdatetime import JalaliDate, timedelta
+import numpy as np
+from unidecode import unidecode
 
 
 app = Client("session", config_file="config.ini")
@@ -90,6 +92,35 @@ async def first_state_recieve_name(message):
     await app.send_message(user_id ,"سال تولد ایشان را ۴ رقمی وارد کنید. برای مثال ۱۳۷۳")
             
 
+async def second_state_recieve_year(message) :
+    'Recieving year of birth'
+    
+    user_id = message.from_user.id
+    year = unidecode(message.text)
+    current_year = JalaliDate.today().year
+    
+    if (len(year) != 4) or (int(year) > current_year) or (int(year) < 1300):
+        await app.send_message(user_id ,"سال تولد معتبر نیست، دوباره سال تولد را وارد کنید.")
+        return
+       
+    month_list = np.array([])
+    for i in range(1,13):
+        i = str(i).zfill(2)
+        month_list = np.append(month_list,[InlineKeyboardButton(text = f"{key.month_dic_key_value[str(i)]}",callback_data = f"{i}")])
+    
+    month_list = month_list.reshape(6,2)
+    
+    mark  = InlineKeyboardMarkup(month_list)
+
+    message = await app.send_message(user_id ,"ماه تولد ایشان را انتخاب کنید.",reply_markup=mark)
+    message_id = message.message_id
+
+    with connection:
+        with connection.cursor() as cursor:
+            cursor.execute(f"UPDATE users SET state = 3 WHERE user_id = {user_id};")     
+            cursor.execute(f"UPDATE events_buffer SET year = '{year}' WHERE user_id = {user_id};")
+            cursor.execute(f"UPDATE events_buffer SET month_id = '{message_id}' WHERE user_id = {user_id};")
+
 
 @app.on_message()
 async def data_gathering(client, message):
@@ -111,6 +142,10 @@ async def data_gathering(client, message):
     
     if user_state[0][0] == 1:
         await first_state_recieve_name(message)
+        return
+    
+    if user_state[0][0] == 2:
+        await second_state_recieve_year(message)  
         return
 
 app.run()
