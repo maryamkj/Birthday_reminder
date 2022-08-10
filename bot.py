@@ -279,6 +279,22 @@ async def delete_event(message):
     await app.send_message(user_id , f"کدام تاریخ تولدو میخواید حذف کنید؟", reply_markup=mark)
 
 
+async def delete_event_query(callback_query):
+    'Deleting chosen events'
+    
+    user_id = callback_query.from_user.id
+    birthday_person_name = callback_query.data 
+    
+    message_id = callback_query.message.message_id
+    await app.delete_messages(user_id ,message_id)
+
+    with connection:
+        with connection.cursor() as cursor:
+            cursor.execute(f"DELETE FROM events WHERE user_id = {user_id} AND birthday_person_name = '{birthday_person_name}';")
+            empty_buffer(user_id, cursor)
+    await app.send_message(user_id ,f"تاریخ تولد {birthday_person_name} با موفقیت حذف شد ", reply_markup=key.mark)
+
+
 @app.on_callback_query()
 async def callback_query_handler(client, callback_query):
     
@@ -294,6 +310,10 @@ async def callback_query_handler(client, callback_query):
     
     if text == "تولد چه کسی را میخواهید مشاهده کنید؟":
         await restore_event(client, callback_query)
+        return
+    
+    if text == "کدام تاریخ تولدو میخواید حذف کنید؟":
+        await delete_event_query( callback_query)
         return
 
 @app.on_message()
