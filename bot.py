@@ -255,6 +255,30 @@ async def restore_event(client, callback_query):
                 return
 
 
+async def delete_event(message):
+    'Showing old events inlineKeyboardButton for deleting'
+    
+    user_id = message.from_user.id
+    
+    with connection:
+        with connection.cursor() as cursor:
+            empty_buffer(user_id, cursor)
+            cursor.execute(f"SELECT birthday_person_name FROM events WHERE user_id = {user_id};")
+            birthday_person_names = cursor.fetchall()
+    
+    if len(birthday_person_names) == 0:
+        await app.send_message(user_id , f"هیچ تاریخ تولدی برای شما ثبت نشده است.")
+        return
+          
+    birthday_person_names_list = []
+    for item in birthday_person_names:
+        birthday_person_names_list.append([InlineKeyboardButton(text = f"{item[0]}",callback_data = f"{item[0]}")])
+    
+    mark = InlineKeyboardMarkup(inline_keyboard=birthday_person_names_list)
+    
+    await app.send_message(user_id , f"کدام تاریخ تولدو میخواید حذف کنید؟", reply_markup=mark)
+
+
 @app.on_callback_query()
 async def callback_query_handler(client, callback_query):
     
@@ -283,6 +307,10 @@ async def data_gathering(client, message):
     
     if message.text == "مشاهده تاریخ تولد های ثبت شده":
         await old_event(message)
+        return 
+    
+    if message.text == "حذف یک تاریخ تولد":
+        await delete_event(message)
         return 
     
     with connection:
