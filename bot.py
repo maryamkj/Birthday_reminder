@@ -234,6 +234,27 @@ async def old_event(message):
     await app.send_message(user_id , f"تولد چه کسی را میخواهید مشاهده کنید؟", reply_markup=mark)
 
 
+async def restore_event(client, callback_query):
+    'Printing birth detail for chosen event'
+    
+    user_id = callback_query.from_user.id
+    birthday_person_name = callback_query.data 
+    
+    message_id = callback_query.message.message_id
+    await app.delete_messages(user_id ,message_id)
+    
+    with connection:
+        with connection.cursor() as cursor:
+            cursor.execute(f"SELECT date_of_birth FROM events WHERE  birthday_person_name = '{birthday_person_name}' AND user_id = {user_id};")
+            date = cursor.fetchall()  
+            try:
+                await app.send_message(user_id ,f"تولد {birthday_person_name} : \n {int(date[0][0][8:10])}  {key.month_dic_key_value[date[0][0][5:7]]} سال {date[0][0][0:4]}.",reply_markup=key.mark)
+                empty_buffer(user_id, cursor)
+            except:
+                await app.send_message(user_id ,f"قبلا تاریخ تولد {birthday_person_name} رو حذف کردید",reply_markup=key.mark)
+                return
+
+
 @app.on_callback_query()
 async def callback_query_handler(client, callback_query):
     
@@ -245,6 +266,10 @@ async def callback_query_handler(client, callback_query):
 
     if text == "روز تولد ایشان را انتخاب کنید.":
         await fourth_state_recieve_day(client, callback_query)
+        return
+    
+    if text == "تولد چه کسی را میخواهید مشاهده کنید؟":
+        await restore_event(client, callback_query)
         return
 
 @app.on_message()
