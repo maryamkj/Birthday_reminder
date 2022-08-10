@@ -6,6 +6,7 @@ import psycopg2
 from persiantools.jdatetime import JalaliDate, timedelta
 import numpy as np
 from unidecode import unidecode
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 
 app = Client("session", config_file="config.ini")
@@ -357,5 +358,34 @@ async def data_gathering(client, message):
     if user_state[0][0] == 4:
         await app.send_message(user_id ,".برای وارد کردن روز تولد از دکمه های شیشه ای استفاده کنید",reply_markup=key.mark)
         return
+
+
+async def alarm(flag):
+    
+    if flag == True:
+        'next day'
+        days_ahead = 1
+    else:
+        'next 30 day'
+        days_ahead = 30
+    next_date = JalaliDate.today() + timedelta(days_ahead)
+    next_day = str(next_date.day).zfill(2)
+    next_month = str(next_date.month).zfill(2)
+    
+    with connection:
+        with connection.cursor() as cursor:
+            cursor.execute(f"SELECT birthday_person_name, user_id FROM events WHERE (SELECT substring(date_of_birth,6,2)) = '{next_month}' and (SELECT substring(date_of_birth,9,2)) = '{next_day}';")
+            info = cursor.fetchall()
+            for item in info:
+                if flag == True:
+                    text_message = f"فردا تولد {item[0]} یادت نره تبریک بگی . :)"
+                else:
+                    text_message = f"اگه میخوای برای روز تولد {item[0]} غافلگیرش کنی الان وقتشه که کم کم برنامه ریزیاتو شروع کنی چون ۳۰ روز دیگر تولدشه." 
+                await app.send_message(item[1] ,text_message,reply_markup=key.mark)
+
+scheduler = AsyncIOScheduler()
+scheduler.add_job(alarm, 'cron',args = [True] ,day_of_week = '*',hour= 23, minute= 00)
+scheduler.add_job(alarm, 'cron',args = [False] ,day_of_week = '*',hour= 12, minute= 00)
+scheduler.start()
 
 app.run()
