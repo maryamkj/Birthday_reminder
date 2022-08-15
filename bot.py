@@ -341,23 +341,18 @@ async def data_gathering(client, message):
     
     if user_state[0][0] == 0:
         await app.send_message(user_id ,"نمیفهمم چی میگید از دکمه های شیشه ای استفاده کنید. ",reply_markup=key.mark)
-        return
     
-    if user_state[0][0] == 1:
+    elif user_state[0][0] == 1:
         await first_state_recieve_name(message)
-        return
     
-    if user_state[0][0] == 2:
+    elif user_state[0][0] == 2:
         await second_state_recieve_year(message)  
-        return
     
-    if user_state[0][0] == 3:
+    elif user_state[0][0] == 3:
         await app.send_message(user_id ,".برای وارد کردن ماه تولد از دکمه های شیشه ای استفاده کنید",reply_markup=key.mark)
-        return
-    
-    if user_state[0][0] == 4:
+
+    elif user_state[0][0] == 4:
         await app.send_message(user_id ,".برای وارد کردن روز تولد از دکمه های شیشه ای استفاده کنید",reply_markup=key.mark)
-        return
 
 
 async def alarm(flag):
