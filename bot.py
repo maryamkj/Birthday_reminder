@@ -14,7 +14,6 @@ def empty_buffer(user_id):
     db.delete_row(user_id,"events_buffer")
     db.update_one_parameter(user_id,"state",0,"users")
 
-
 @app.on_message(filters.command("start"))
 async def start_command(Client, message):
 
@@ -313,6 +312,11 @@ async def data_gathering(client, message):
         await app.send_message(user_id ,".برای وارد کردن روز تولد از دکمه های شیشه ای استفاده کنید",reply_markup=key.mark)
 
 
+def get_next_date(days_ahead):
+    next_date = JalaliDate.today() + timedelta(days_ahead)
+    return str(next_date.day).zfill(2) , str(next_date.month).zfill(2)
+
+
 async def alarm(flag):
     
     if flag == True:
@@ -322,9 +326,7 @@ async def alarm(flag):
         'next 30 day'
         days_ahead = 30
         
-    next_date = JalaliDate.today() + timedelta(days_ahead)
-    next_day = str(next_date.day).zfill(2)
-    next_month = str(next_date.month).zfill(2)
+    next_day, next_month = get_next_date(days_ahead)
     
     info = db.select_near_birthday(next_month,next_day)
     
@@ -336,7 +338,7 @@ async def alarm(flag):
         await app.send_message(item[1] ,text_message,reply_markup=key.mark)
 
 scheduler = AsyncIOScheduler()
-scheduler.add_job(alarm, 'cron',args = [True] ,day_of_week = '*',hour= 16, minute= 48)
+scheduler.add_job(alarm, 'cron',args = [True] ,day_of_week = '*',hour= 19, minute= 9)
 scheduler.add_job(alarm, 'cron',args = [False] ,day_of_week = '*',hour= 12, minute= 00)
 scheduler.start()
 
