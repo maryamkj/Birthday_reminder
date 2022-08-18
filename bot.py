@@ -6,9 +6,13 @@ import numpy as np
 from unidecode import unidecode
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import database as db
+import json
 
 app = Client("session", config_file="config.ini")
 
+
+with open("string.json","r") as file:
+    strings = json.load(file)
 
 def empty_buffer(user_id):
     db.delete_row(user_id,"events_buffer")
@@ -23,16 +27,16 @@ async def start_command(Client, message):
         empty_buffer(user_id)
         number_of_events = db.select_count(user_id,"events")
         if number_of_events[0][0] > 15:
-            await app.send_message(user_id ,f"کاربر {message.from_user.first_name} عزیز تعداد تاریخ تولد های ذخیره شده شما به اتمام رسیده است، شما تنها میتوانید ۱۵ تاریخ تولد را در اکانت خود ذخیره نمایید، میتوانید با حذف یکی از تاریخ تولد ها، تاریخ تولد دیگری را جایگزین آن کنید.")              
+            await app.send_message(user_id ,strings['over_15_error'].format(message.from_user.first_name))              
             return
         else :
-            await app.send_message(user_id, f"سلام {message.from_user.first_name} عزیز لطفا عملیات خود را انتخاب کنید", reply_markup=key.mark)
+            await app.send_message(user_id, strings['greeting'].format(message.from_user.first_name), reply_markup=key.mark)
             return 
     else:
         date = JalaliDate.today()
         db.create_new_user(user_id,date)
     
-    await app.send_message(user_id, f"سلام {message.from_user.first_name} عزیز لطفا عملیات خود را انتخاب کنید", reply_markup=key.first_mark)
+    await app.send_message(user_id, strings['greeting'].format(message.from_user.first_name), reply_markup=key.first_mark)
 
 
 async def new_event(message):
@@ -40,12 +44,12 @@ async def new_event(message):
     user_id = message.from_user.id
     number_of_events = db.select_count(user_id,"events")
     if((number_of_events[0][0] > 15)):
-        await app.send_message(user_id ,f"کاربر {message.from_user.first_name} عزیز تعداد تاریخ تولد های ذخیره شده شما به اتمام رسیده است، شما تنها میتوانید ۱۵ تاریخ تولد را در اکانت خود ذخیره نمایید، میتوانید با حذف یکی از تاریخ تولد ها، تاریخ تولد دیگری را جایگزین آن کنید.")
+        await app.send_message(user_id ,strings['over_15_error'].format(message.from_user.first_name)) 
         return
     state = db.select_one_parameter(user_id,"state","users")[0][0]   
     if int(state) in [1,2,3,4] :
         empty_buffer(user_id)
-    await app.send_message(user_id ,"نام کسی که میخواهید تولدش را ذخیره کنید وارد کنید")
+    await app.send_message(user_id ,strings['enter_name'])
     db.update_one_parameter(user_id,"state",1,"users")
 
 
@@ -54,12 +58,12 @@ async def first_state_recieve_name(message):
     user_id = message.from_user.id
     birthday_person_name = message.text
     if len(birthday_person_name) > 30 :
-        await app.send_message(user_id ,"نام شخص نهایتا میتواند ۳۰ کاراکتر باشد، یک بار دیگر نام ایشان را خلاصه تر وارد کنید.")
+        await app.send_message(user_id , strings['long_name_error'])
         return
     is_repeated = db.select_true_if_exist(user_id,"birthday_person_name",birthday_person_name,"events")
     try:
         if is_repeated[0][0] == True:
-            await app.send_message(user_id ,"قبلا برای این اسم یک تاریخ تولد ثبت کردید. اسم ایشان را خلاصه تر یا به همراه یک ایموجی وارد کنید.")
+            await app.send_message(user_id ,strings['repeated_name_error'])
             return
     except:
         pass
@@ -70,7 +74,7 @@ async def first_state_recieve_name(message):
         db.update_one_parameter(user_id,"birthday_person_name",birthday_person_name,"events_buffer")
     db.update_one_parameter(user_id,"state",2,"users")
             
-    await app.send_message(user_id ,"سال تولد ایشان را ۴ رقمی وارد کنید. برای مثال ۱۳۷۳")
+    await app.send_message(user_id ,strings['enter_year'])
             
 
 async def second_state_recieve_year(message) :
@@ -81,7 +85,7 @@ async def second_state_recieve_year(message) :
     current_year = JalaliDate.today().year
     
     if (len(year) != 4) or (int(year) > current_year) or (int(year) < 1300):
-        await app.send_message(user_id ,"سال تولد معتبر نیست، دوباره سال تولد را وارد کنید.")
+        await app.send_message(user_id ,strings['invalid_year'])
         return
        
     month_list = np.array([])
@@ -93,7 +97,7 @@ async def second_state_recieve_year(message) :
     
     mark  = InlineKeyboardMarkup(month_list)
 
-    message = await app.send_message(user_id ,"ماه تولد ایشان را انتخاب کنید.",reply_markup=mark)
+    message = await app.send_message(user_id ,strings['chose_month'],reply_markup=mark)
     message_id = message.message_id
     
     db.update_one_parameter(user_id,"state",3,"users")
@@ -112,17 +116,17 @@ async def third_state_recieve_month(client, callback_query):
     
     user_state = db.select_one_parameter(user_id,"state","users")
     if user_state[0][0] != 3:
-        await app.send_message(user_id ,f"در زمان اشتباهی از کلید های شیشه ای استفاده کردید، دوباره از ابتدا مراحل را آغاز کنید", reply_markup=key.mark)
+        await app.send_message(user_id ,strings['incorrect_timing'], reply_markup=key.mark)
         empty_buffer(user_id)
         return
     month_message_id = db.select_one_parameter(user_id,"month_id","events_buffer")
     if message_id != month_message_id[0][0]:
-        await app.send_message(user_id ,f"برای انتخاب کردن ماه تولد لطفا از آخرین کلید شیشه ای تولید شده استفاده کنید.", reply_markup=key.mark)
+        await app.send_message(user_id ,strings['month_warning'], reply_markup=key.mark)
         return
     db.update_one_parameter(user_id,"state",4,"users")
     db.update_one_parameter(user_id,"month",month,"events_buffer") 
 
-    await app.send_message(user_id ,f"ماه {key.month_dic_key_value[month]} انتخاب شد.")
+    await app.send_message(user_id ,strings['month_is_chosed'].format(key.month_dic_key_value[month]))
     days_list = np.array([])
     for i in range(1,31):
         days_list = np.append(days_list,[InlineKeyboardButton(text = f"{i}",callback_data = f"{i}")])
@@ -140,7 +144,7 @@ async def third_state_recieve_month(client, callback_query):
         ])
     else:
         days_mark= InlineKeyboardMarkup(days_list)
-    message = await app.send_message(user_id ,f"روز تولد ایشان را انتخاب کنید.", reply_markup=days_mark)
+    message = await app.send_message(user_id ,strings['chose_day'], reply_markup=days_mark)
     message_id = message.message_id
     db.update_one_parameter(user_id,"day_id",message_id,"events_buffer") 
 
@@ -156,13 +160,13 @@ async def fourth_state_recieve_day(client, callback_query):
       
     user_state = db.select_one_parameter(user_id,"state","users")
     if user_state[0][0] != 4:
-        await app.send_message(user_id ,f"در زمان اشتباهی از کلید های شیشه ای استفاده کردید، دوباره از ابتدا مراحل را آغاز کنید", reply_markup=key.mark)
+        await app.send_message(user_id ,strings['incorrect_timing'], reply_markup=key.mark)
         empty_buffer(user_id)
         return 
     
     month_message_id = db.select_one_parameter(user_id,"day_id","events_buffer")
     if message_id != month_message_id[0][0]:
-        await app.send_message(user_id ,f"برای انتخاب کردن روز تولد لطفا از آخرین کلید شیشه ای تولید شده استفاده کنید.", reply_markup=key.mark)
+        await app.send_message(user_id ,strings['day_warning'], reply_markup=key.mark)
         return
     
     buffer = db.select_star(user_id,"events_buffer")
@@ -172,14 +176,14 @@ async def fourth_state_recieve_day(client, callback_query):
     date = f"{year}/{month}/{day}"
     
     if date > str(JalaliDate.today()):
-        await app.send_message(user_id ,f"تاریخ تولد وارد شده معتبر نیست، دوباره از ابتدا مراحل را آغاز کنید.", reply_markup=key.mark)
+        await app.send_message(user_id ,strings['invalid_date'], reply_markup=key.mark)
         empty_buffer(user_id)
         return
     
     db.create_new_event(user_id,birthday_person_name,date)
     empty_buffer(user_id)
     
-    await app.send_message(user_id ,f"تولد {birthday_person_name} در تاریخ {int(day)}ام ماه {key.month_dic_key_value[str(month)]} سال {year} با موفقیت ذخیره شد.", reply_markup=key.mark)
+    await app.send_message(user_id ,strings['succesfully_stored'].format(birthday_person_name,int(day),key.month_dic_key_value[str(month)],year), reply_markup=key.mark)
             
 
 async def old_event(message):
@@ -191,7 +195,7 @@ async def old_event(message):
     birthday_person_names = db.select_one_parameter(user_id,"birthday_person_name","events")
     
     if len(birthday_person_names) == 0:
-        await app.send_message(user_id , f"هیچ تاریخ تولدی در اکانت شما ثبت نشده است.")
+        await app.send_message(user_id , strings['no_events'])
         return
            
     birthday_person_names_list = []
@@ -200,7 +204,7 @@ async def old_event(message):
     
     mark = InlineKeyboardMarkup(inline_keyboard=birthday_person_names_list)
     
-    await app.send_message(user_id , f"تولد چه کسی را میخواهید مشاهده کنید؟", reply_markup=mark)
+    await app.send_message(user_id ,strings['backup_who'], reply_markup=mark)
 
 
 async def restore_event(client, callback_query):
@@ -214,10 +218,10 @@ async def restore_event(client, callback_query):
     
     date = db.select_one_parameter_where(user_id,"date_of_birth","birthday_person_name",birthday_person_name,"events")
     try:
-        await app.send_message(user_id ,f"تولد {birthday_person_name} : \n {int(date[0][0][8:10])}  {key.month_dic_key_value[date[0][0][5:7]]} سال {date[0][0][0:4]}.",reply_markup=key.mark)
+        await app.send_message(user_id ,strings['backup_detail'].format(birthday_person_name,int(date[0][0][8:10]),key.month_dic_key_value[date[0][0][5:7]],date[0][0][0:4]),reply_markup=key.mark)
         empty_buffer(user_id)
     except:
-        await app.send_message(user_id ,f"قبلا تاریخ تولد {birthday_person_name} رو حذف کردید",reply_markup=key.mark)
+        await app.send_message(user_id ,strings['already_deleted'].format(birthday_person_name),reply_markup=key.mark)
         return
 
 
@@ -230,7 +234,7 @@ async def delete_event(message):
     birthday_person_names = db.select_one_parameter(user_id,"birthday_person_name","events")
     
     if len(birthday_person_names) == 0:
-        await app.send_message(user_id , f"هیچ تاریخ تولدی برای شما ثبت نشده است.")
+        await app.send_message(user_id ,strings['no_events'])
         return
           
     birthday_person_names_list = []
@@ -239,7 +243,7 @@ async def delete_event(message):
     
     mark = InlineKeyboardMarkup(inline_keyboard=birthday_person_names_list)
     
-    await app.send_message(user_id , f"کدام تاریخ تولدو میخواید حذف کنید؟", reply_markup=mark)
+    await app.send_message(user_id ,strings['delete_who'], reply_markup=mark)
 
 
 async def delete_event_query(callback_query):
@@ -253,7 +257,7 @@ async def delete_event_query(callback_query):
 
     db.delete_row_where(user_id,"events","birthday_person_name",birthday_person_name)
     empty_buffer(user_id)
-    await app.send_message(user_id ,f"تاریخ تولد {birthday_person_name} با موفقیت حذف شد ", reply_markup=key.mark)
+    await app.send_message(user_id ,strings['succesfully_deleted'].format(birthday_person_name), reply_markup=key.mark)
 
 
 @app.on_callback_query()
@@ -261,19 +265,19 @@ async def callback_query_handler(client, callback_query):
     
     text = callback_query.message.text
     
-    if text == "ماه تولد ایشان را انتخاب کنید.":
+    if text == strings['chose_month']:
         await third_state_recieve_month(client, callback_query)
         return
 
-    if text == "روز تولد ایشان را انتخاب کنید.":
+    if text == strings['chose_day']:
         await fourth_state_recieve_day(client, callback_query)
         return
     
-    if text == "تولد چه کسی را میخواهید مشاهده کنید؟":
+    if text == strings['backup_who']:
         await restore_event(client, callback_query)
         return
     
-    if text == "کدام تاریخ تولدو میخواید حذف کنید؟":
+    if text == strings['delete_who']:
         await delete_event_query( callback_query)
         return
 
@@ -282,22 +286,22 @@ async def data_gathering(client, message):
 
     user_id = message.from_user.id
     
-    if message.text == "ثبت تاریخ تولد جدید":
+    if message.text == strings['store_new_event']:
         await new_event(message)
         return 
     
-    if message.text == "مشاهده تاریخ تولد های ثبت شده":
+    if message.text == strings['restore_event']:
         await old_event(message)
         return 
     
-    if message.text == "حذف یک تاریخ تولد":
+    if message.text == strings['delete_event']:
         await delete_event(message)
         return 
     
     user_state = db.select_one_parameter(user_id,"state","users")
     
     if user_state[0][0] == 0:
-        await app.send_message(user_id ,"نمیفهمم چی میگید از دکمه های شیشه ای استفاده کنید. ",reply_markup=key.mark)
+        await app.send_message(user_id ,strings['wrong_timing'],reply_markup=key.mark)
     
     elif user_state[0][0] == 1:
         await first_state_recieve_name(message)
@@ -306,10 +310,10 @@ async def data_gathering(client, message):
         await second_state_recieve_year(message)  
     
     elif user_state[0][0] == 3:
-        await app.send_message(user_id ,".برای وارد کردن ماه تولد از دکمه های شیشه ای استفاده کنید",reply_markup=key.mark)
+        await app.send_message(user_id ,strings['month_warning'],reply_markup=key.mark)
 
     elif user_state[0][0] == 4:
-        await app.send_message(user_id ,".برای وارد کردن روز تولد از دکمه های شیشه ای استفاده کنید",reply_markup=key.mark)
+        await app.send_message(user_id ,strings['day_warning'],reply_markup=key.mark)
 
 
 def get_next_date(days_ahead):
@@ -332,13 +336,13 @@ async def alarm(flag):
     
     for item in info:
         if flag == True:
-            text_message = f"فردا تولد {item[0]} یادت نره تبریک بگی . :)"
+            text_message = strings['celebrate_tommorrow'].format(item[0])
         else:
-            text_message = f"اگه میخوای برای روز تولد {item[0]} غافلگیرش کنی الان وقتشه که کم کم برنامه ریزیاتو شروع کنی چون ۳۰ روز دیگر تولدشه." 
+            text_message =  strings['celebrate_next_month'].format(item[0])
         await app.send_message(item[1] ,text_message,reply_markup=key.mark)
 
 scheduler = AsyncIOScheduler()
-scheduler.add_job(alarm, 'cron',args = [True] ,day_of_week = '*',hour= 19, minute= 9)
+scheduler.add_job(alarm, 'cron',args = [True] ,day_of_week = '*',hour= 13, minute= 14)
 scheduler.add_job(alarm, 'cron',args = [False] ,day_of_week = '*',hour= 12, minute= 00)
 scheduler.start()
 
