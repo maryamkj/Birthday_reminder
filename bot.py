@@ -341,7 +341,7 @@ async def alarm(flag):
             text_message =  strings['celebrate_next_month'].format(item[0])
         await app.send_message(item[1] ,text_message,reply_markup=key.mark)
 
-scheduler = AsyncIOScheduler()
+scheduler = AsyncIOScheduler(timezone="Asia/Tehran")
 scheduler.add_job(alarm, 'cron',args = [True] ,day_of_week = '*',hour= 13, minute= 14)
 scheduler.add_job(alarm, 'cron',args = [False] ,day_of_week = '*',hour= 12, minute= 00)
 scheduler.start()
